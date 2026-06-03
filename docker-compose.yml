@@ -1,0 +1,82 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-researchrag-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-researchrag}
+      MYSQL_USER: ${MYSQL_USER:-researchrag}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-researchrag}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Server=mysql;Port=3306;Database=${MYSQL_DATABASE:-researchrag};User=${MYSQL_USER:-researchrag};Password=${MYSQL_PASSWORD:-researchrag};
+      Jwt__Issuer: ${JWT_ISSUER:-ResearchRAG}
+      Jwt__Audience: ${JWT_AUDIENCE:-ResearchRAG}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-change-me-to-a-long-random-secret-of-at-least-32-bytes}
+      Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      Storage__UploadRoot: ${UPLOAD_ROOT:-/app/uploads}
+      Qdrant__Url: ${QDRANT_URL:-http://qdrant:6333}
+      Ai__ChatProvider: ${CHAT_PROVIDER:-echo}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/app/uploads
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-researchrag}:${MYSQL_PASSWORD:-researchrag}@mysql:3306/${MYSQL_DATABASE:-researchrag}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      UPLOAD_ROOT: ${UPLOAD_ROOT:-/app/uploads}
+      EMBEDDING_MODEL: BAAI/bge-large-en-v1.5
+    depends_on:
+      mysql:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${API_BASE_URL:-http://localhost:8080}
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql-data:
+  qdrant-data:
+  uploads:
+

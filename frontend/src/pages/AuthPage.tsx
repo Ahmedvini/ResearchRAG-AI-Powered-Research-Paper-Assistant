@@ -11,6 +11,22 @@ export function AuthPage() {
   const [displayName, setDisplayName] = useState('Demo Researcher');
   const [error, setError] = useState('');
 
+  function switchMode() {
+    setError('');
+    if (mode === 'login') {
+      setMode('register');
+      setEmail('');
+      setPassword('');
+      setDisplayName('');
+      return;
+    }
+
+    setMode('login');
+    setEmail('user@researchrag.local');
+    setPassword('User123!');
+    setDisplayName('Demo Researcher');
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
@@ -67,7 +83,7 @@ export function AuthPage() {
           <button className="command-button w-full justify-center" type="submit">
             {mode === 'login' ? 'Sign in' : 'Register'}
           </button>
-          <button className="secondary-button w-full justify-center" type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+          <button className="secondary-button w-full justify-center" type="button" onClick={switchMode}>
             {mode === 'login' ? 'Need an account?' : 'Already registered?'}
           </button>
         </form>
@@ -75,4 +91,3 @@ export function AuthPage() {
     </main>
   );
 }
-

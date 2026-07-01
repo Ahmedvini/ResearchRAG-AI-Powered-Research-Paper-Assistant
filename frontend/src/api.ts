@@ -1,6 +1,6 @@
 import type { AuthResponse, Chat, ChatMessage, Dashboard, ResearchDocument, SearchResult, Workspace } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080`;
 
 export function getToken() {
   return localStorage.getItem('researchrag.accessToken');
@@ -29,7 +29,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (!(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  } catch {
+    throw new Error(`Cannot reach the ResearchRAG API at ${API_BASE_URL}. Start the backend and try again.`);
+  }
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || response.statusText);
@@ -61,4 +66,3 @@ export const api = {
   adminStats: () => request<Record<string, number>>('/api/Admin/stats'),
   processingJobs: () => request<Array<Record<string, unknown>>>('/api/Admin/processing-jobs')
 };
-

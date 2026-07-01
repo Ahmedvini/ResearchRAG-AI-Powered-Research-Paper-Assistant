@@ -19,7 +19,15 @@ public static class DependencyInjection
             "Server=localhost;Port=3306;Database=researchrag;User=researchrag;Password=researchrag;";
 
         services.AddDbContext<AppDbContext>(options =>
-            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+        {
+            if (string.Equals(connectionString, "InMemory", StringComparison.OrdinalIgnoreCase))
+            {
+                options.UseInMemoryDatabase("ResearchRagDev");
+                return;
+            }
+
+            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+        });
 
         services.AddScoped<IAuthTokenService, AuthTokenService>();
         services.AddScoped<IDocumentProcessorClient, DatabaseDocumentProcessorClient>();
@@ -37,4 +45,3 @@ public static class DependencyInjection
         return services;
     }
 }
-

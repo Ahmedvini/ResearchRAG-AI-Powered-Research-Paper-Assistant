@@ -37,6 +37,14 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(origin => Uri.TryCreate(origin, UriKind.Absolute, out var uri) && uri.Port == 5173)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+            return;
+        }
+
         var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? ["http://localhost:5173"];
         policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
     });
@@ -94,4 +102,3 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "ResearchR
 app.Run();
 
 public partial class Program;
-

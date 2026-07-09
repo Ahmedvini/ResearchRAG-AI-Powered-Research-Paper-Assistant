@@ -9,6 +9,8 @@ import { SearchPage } from './pages/SearchPage';
 import { AdminPage } from './pages/AdminPage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
 import { ResearchToolsPage } from './pages/ResearchToolsPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 function Protected() {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -20,6 +22,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AuthPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/" element={<Protected />}>
         <Route index element={<Navigate to="/workspaces" replace />} />
         <Route path="workspaces" element={<WorkspacesPage />} />

@@ -50,6 +50,13 @@ services:
       Ollama__EmbeddingModel: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
       Cohere__ApiKey: ${COHERE_API_KEY:-}
       Cohere__RerankModel: ${COHERE_RERANK_MODEL:-rerank-v3.5}
+      Email__From: ${EMAIL_FROM:-no-reply@researchrag.local}
+      Email__FrontendBaseUrl: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      Smtp__Host: ${SMTP_HOST:-}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__Username: ${SMTP_USERNAME:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__EnableSsl: ${SMTP_ENABLE_SSL:-true}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

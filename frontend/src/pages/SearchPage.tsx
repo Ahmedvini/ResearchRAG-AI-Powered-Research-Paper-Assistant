@@ -1,12 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { PageHeader } from '../components/PageHeader';
 
 export function SearchPage() {
   const [query, setQuery] = useState('');
-  const { data = [] } = useQuery({ queryKey: ['search', query], queryFn: () => api.search(query), enabled: query.length > 1 });
+  // Debounced copy of the input so we do not fire one request per keystroke.
+  const [debounced, setDebounced] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(query), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const { data = [] } = useQuery({ queryKey: ['search', debounced], queryFn: () => api.search(debounced), enabled: debounced.length > 1 });
 
   return (
     <>

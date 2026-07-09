@@ -22,18 +22,24 @@ export function DocumentsPage() {
         <div>
           <h2 className="font-bold">PDF ingestion</h2>
           <p className="text-sm text-[#60706b]">Queued files move through extraction, chunking, embedding, then become ready for cited chat.</p>
+          {upload.error instanceof Error && (
+            <p className="mt-2 rounded-md border border-[#e4b7a9] bg-[#fff4f0] p-2 text-sm text-[#8a3b25]">{upload.error.message}</p>
+          )}
         </div>
-        <label className={`command-button ${!workspaceId ? 'pointer-events-none opacity-50' : ''}`}>
+        <label className={`command-button ${!workspaceId || upload.isPending ? 'pointer-events-none opacity-50' : ''}`}>
           <Upload className="h-4 w-4" />
-          Upload PDF
+          {upload.isPending ? 'Uploading...' : 'Upload PDF'}
           <input
             className="hidden"
             type="file"
             accept="application/pdf"
-            disabled={!workspaceId}
+            disabled={!workspaceId || upload.isPending}
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) upload.mutate(file);
+              // Reset so selecting the same file again (e.g. retry after a
+              // failure) still fires this handler.
+              event.target.value = '';
             }}
           />
         </label>

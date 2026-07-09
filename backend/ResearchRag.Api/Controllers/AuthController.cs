@@ -18,6 +18,11 @@ public sealed class AuthController(AppDbContext db, IAuthTokenService tokenServi
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
+        var displayName = request.DisplayName.Trim();
+        if (email.Length < 5 || !email.Contains('@')) return BadRequest("A valid email address is required.");
+        if (string.IsNullOrWhiteSpace(displayName)) return BadRequest("Display name is required.");
+        if (request.Password.Length < 8) return BadRequest("Password must be at least 8 characters.");
+
         if (await db.Users.AnyAsync(x => x.Email == email, cancellationToken))
         {
             return Conflict("Email is already registered.");
@@ -26,7 +31,7 @@ public sealed class AuthController(AppDbContext db, IAuthTokenService tokenServi
         var user = new User
         {
             Email = email,
-            DisplayName = request.DisplayName.Trim(),
+            DisplayName = displayName,
             PasswordHash = ""
         };
         user.PasswordHash = _hasher.HashPassword(user, request.Password);

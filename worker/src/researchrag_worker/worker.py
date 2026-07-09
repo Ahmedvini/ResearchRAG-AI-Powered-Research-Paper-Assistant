@@ -13,6 +13,8 @@ from researchrag_worker.metadata import extract_metadata
 from researchrag_worker.pdf import extract_pages
 from researchrag_worker.sections import split_page_into_sections
 
+UPSERT_BATCH_SIZE = 128
+
 
 def main() -> None:
     settings = Settings()
@@ -109,7 +111,7 @@ def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, set
                 chunks.extend(recursive_chunk(section_text, page_number, section_name, settings.chunk_size, settings.chunk_overlap))
 
         with engine.begin() as connection:
-            connection.execute(text("UPDATE Documents SET Status='Chunking', Title=:title, Authors=:authors, PublicationYear=:year, Abstract=:abstract, Keywords=:keywords WHERE Id=:id"), {
+            connection.execute(text("UPDATE Documents SET Status='Embedding', Title=:title, Authors=:authors, PublicationYear=:year, Abstract=:abstract, Keywords=:keywords WHERE Id=:id"), {
                 "id": job["document_id"],
                 "title": metadata.title,
                 "authors": metadata.authors,
@@ -117,12 +119,46 @@ def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, set
                 "abstract": metadata.abstract,
                 "keywords": metadata.keywords,
             })
-            connection.execute(text("DELETE FROM DocumentChunks WHERE DocumentId=:id"), {"id": job["document_id"]})
 
-            points: list[PointStruct] = []
-            for chunk in chunks:
-                chunk_id = str(uuid4())
-                vector_id = str(uuid4())
+        # Embed before touching chunk tables: with OpenAI/Ollama each chunk is a
+        # network call, and holding a transaction open for minutes stalls every
+        # other writer (MySQL's lock wait timeout is 50s by default).
+        points: list[PointStruct] = []
+        rows: list[dict] = []
+        for chunk in chunks:
+            chunk_id = str(uuid4())
+            vector_id = str(uuid4())
+            vector = embeddings.embed(chunk.text)
+            rows.append(
+                {
+                    "id": chunk_id,
+                    "document_id": job["document_id"],
+                    "workspace_id": job["workspace_id"],
+                    "text": chunk.text,
+                    "page": chunk.page_number,
+                    "section": chunk.section_name,
+                    "vector_id": vector_id,
+                }
+            )
+            points.append(
+                PointStruct(
+                    id=vector_id,
+                    vector=vector,
+                    payload={
+                        "chunk_id": chunk_id,
+                        "document_id": str(job["document_id"]),
+                        "workspace_id": str(job["workspace_id"]),
+                        "page_number": chunk.page_number,
+                        "section": chunk.section_name,
+                    },
+                )
+            )
+
+        # Old chunk rows are only replaced once every embedding succeeded, so a
+        # failed run cannot leave the document half-indexed.
+        with engine.begin() as connection:
+            connection.execute(text("DELETE FROM DocumentChunks WHERE DocumentId=:id"), {"id": job["document_id"]})
+            for row in rows:
                 connection.execute(
                     text(
                         """
@@ -130,34 +166,13 @@ def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, set
                         VALUES (:id, UTC_TIMESTAMP(6), :document_id, :workspace_id, :text, :page, :section, :vector_id)
                         """
                     ),
-                    {
-                        "id": chunk_id,
-                        "document_id": job["document_id"],
-                        "workspace_id": job["workspace_id"],
-                        "text": chunk.text,
-                        "page": chunk.page_number,
-                        "section": chunk.section_name,
-                        "vector_id": vector_id,
-                    },
-                )
-                points.append(
-                    PointStruct(
-                        id=vector_id,
-                        vector=embeddings.embed(chunk.text),
-                        payload={
-                            "chunk_id": chunk_id,
-                            "document_id": str(job["document_id"]),
-                            "workspace_id": str(job["workspace_id"]),
-                            "page_number": chunk.page_number,
-                            "section": chunk.section_name,
-                        },
-                    )
+                    row,
                 )
 
-            connection.execute(text("UPDATE Documents SET Status='Embedding' WHERE Id=:id"), {"id": job["document_id"]})
-
-        if points:
-            qdrant.upsert(collection_name=settings.qdrant_collection, points=points)
+        # Batch the upsert: a large PDF can produce thousands of points, and a
+        # single request with all of them can exceed Qdrant's payload limits.
+        for start in range(0, len(points), UPSERT_BATCH_SIZE):
+            qdrant.upsert(collection_name=settings.qdrant_collection, points=points[start : start + UPSERT_BATCH_SIZE])
 
         with engine.begin() as connection:
             connection.execute(text("UPDATE Documents SET Status='Ready' WHERE Id=:id"), {"id": job["document_id"]})
@@ -194,3 +209,13 @@ def ensure_collection(qdrant: QdrantClient, collection: str, dimension: int) -> 
     existing = {item.name for item in qdrant.get_collections().collections}
     if collection not in existing:
         qdrant.create_collection(collection, vectors_config=VectorParams(size=dimension, distance=Distance.COSINE))
+        return
+
+    vectors = qdrant.get_collection(collection).config.params.vectors
+    existing_size = getattr(vectors, "size", None)
+    if existing_size is not None and existing_size != dimension:
+        raise ValueError(
+            f"Qdrant collection '{collection}' stores {existing_size}-dimensional vectors, but the "
+            f"configured embedding provider produces {dimension} dimensions. Align EMBEDDING_PROVIDER/"
+            f"EMBEDDING_MODEL with the data or recreate the collection (existing documents must be re-uploaded)."
+        )

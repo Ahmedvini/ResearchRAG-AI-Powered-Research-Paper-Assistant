@@ -14,6 +14,13 @@ def test_detect_roman_numeral_heading():
     assert detect_section("IV. Results") == "Results"
 
 
+def test_detect_references_heading():
+    # Without this alias, reference lists inherit the previous section name
+    # (usually Conclusion) and pollute keyword-based analysis.
+    assert detect_section("References") == "References"
+    assert detect_section("Bibliography") == "References"
+
+
 def test_detect_does_not_strip_normal_words():
     assert detect_section("I think this is fine", "Discussion") == "Discussion"
 

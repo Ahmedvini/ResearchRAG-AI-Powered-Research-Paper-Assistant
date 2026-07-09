@@ -72,6 +72,9 @@ export function ChatPage() {
               </article>
             ))}
           </div>
+          {send.error instanceof Error && (
+            <div className="mx-3 mb-2 rounded-md border border-[#e4b7a9] bg-[#fff4f0] p-2 text-sm text-[#8a3b25]">{send.error.message}</div>
+          )}
           <form
             className="flex gap-2 border-t border-line p-3"
             onSubmit={(event) => {
@@ -82,7 +85,7 @@ export function ChatPage() {
             <input className="field" placeholder="What dataset was used?" value={question} onChange={(event) => setQuestion(event.target.value)} />
             <button className="command-button" disabled={!question || !chatId || send.isPending}>
               <Send className="h-4 w-4" />
-              Ask
+              {send.isPending ? 'Asking...' : 'Ask'}
             </button>
           </form>
         </section>

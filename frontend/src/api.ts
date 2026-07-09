@@ -103,6 +103,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   login: (email: string, password: string) => request<AuthResponse>('/api/Auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   register: (email: string, password: string, displayName: string) => request<AuthResponse>('/api/Auth/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) }),
+  logout: () => request<void>('/api/Auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken: getRefreshToken() ?? '' }) }),
   workspaces: () => request<Workspace[]>('/api/Workspaces'),
   createWorkspace: (name: string, description: string) => request<Workspace>('/api/Workspaces', { method: 'POST', body: JSON.stringify({ name, description }) }),
   dashboard: () => request<Dashboard>('/api/Dashboard'),

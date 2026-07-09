@@ -1,6 +1,6 @@
 import { BarChart3, FileText, FlaskConical, LogOut, MessageSquareText, Search, Shield, SquareLibrary } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { clearAuth, currentUser } from '../api';
+import { api, clearAuth, currentUser } from '../api';
 
 const navItems = [
   { to: '/workspaces', label: 'Workspaces', icon: SquareLibrary },
@@ -49,6 +49,9 @@ export function AppShell() {
           <button
             className="secondary-button"
             onClick={() => {
+              // Best-effort server-side revocation of the refresh token; the
+              // local session is cleared regardless of the outcome.
+              api.logout().catch(() => undefined);
               clearAuth();
               navigate('/login');
             }}

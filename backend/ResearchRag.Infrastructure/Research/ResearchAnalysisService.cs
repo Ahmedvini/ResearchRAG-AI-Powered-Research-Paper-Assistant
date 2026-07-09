@@ -179,7 +179,9 @@ public sealed class ResearchAnalysisService(AppDbContext db, ILLMProvider llmPro
         IQueryable<Document> query = db.Documents
             .Include(x => x.Workspace)
             .Include(x => x.PaperExtraction)
-            .Include(x => x.Chunks)
+            // Bounded include: ExtractField only scans for keywords, and loading
+            // every chunk of every paper into memory does not scale.
+            .Include(x => x.Chunks.OrderBy(c => c.PageNumber).Take(60))
             .Where(x => x.WorkspaceId == workspaceId && x.Workspace!.UserId == userId);
         if (documentIds is { Count: > 0 })
         {

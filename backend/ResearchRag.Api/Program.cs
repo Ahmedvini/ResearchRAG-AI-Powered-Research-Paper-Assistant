@@ -59,6 +59,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddRateLimiter(options =>
 {
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     // Partition by the JWT subject when authenticated (requires UseRateLimiter to
     // run after UseAuthentication), otherwise fall back to the caller's IP.
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>

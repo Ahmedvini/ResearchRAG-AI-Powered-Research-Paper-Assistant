@@ -74,7 +74,10 @@ public sealed class DocumentsController(AppDbContext db, IConfiguration configur
     {
         return await db.DocumentChunks
             .Where(x => x.DocumentId == id && x.Document!.Workspace!.UserId == CurrentUserId)
+            // CreatedAt reflects the worker's sequential inserts, restoring the
+            // original reading order for chunks within the same page.
             .OrderBy(x => x.PageNumber)
+            .ThenBy(x => x.CreatedAt)
             .Select(x => new DocumentChunkDto(x.Id, x.Text, x.PageNumber, x.SectionName))
             .ToListAsync(cancellationToken);
     }

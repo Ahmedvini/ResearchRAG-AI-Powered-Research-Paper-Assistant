@@ -14,6 +14,10 @@ SECTION_ALIASES = {
     "discussion": "Discussion",
     "conclusion": "Conclusion",
     "conclusions": "Conclusion",
+    "references": "References",
+    "bibliography": "References",
+    "acknowledgments": "Acknowledgments",
+    "acknowledgements": "Acknowledgments",
 }
 
 

@@ -28,7 +28,8 @@ public sealed class ChatsController(AppDbContext db, IRagAnswerService rag) : Ap
         var ownsWorkspace = await db.Workspaces.AnyAsync(x => x.Id == request.WorkspaceId && x.UserId == CurrentUserId, cancellationToken);
         if (!ownsWorkspace) return NotFound("Workspace not found.");
 
-        var chat = new ChatSession { WorkspaceId = request.WorkspaceId, Title = request.Title.Trim() };
+        var title = string.IsNullOrWhiteSpace(request.Title) ? "Research chat" : request.Title.Trim();
+        var chat = new ChatSession { WorkspaceId = request.WorkspaceId, Title = title };
         db.ChatSessions.Add(chat);
         await db.SaveChangesAsync(cancellationToken);
         return CreatedAtAction(nameof(Messages), new { id = chat.Id }, new ChatDto(chat.Id, chat.WorkspaceId, chat.Title, chat.CreatedAt));
@@ -52,6 +53,7 @@ public sealed class ChatsController(AppDbContext db, IRagAnswerService rag) : Ap
     [HttpPost("{id:guid}/messages")]
     public async Task<ActionResult<RagAnswerDto>> Send(Guid id, SendMessageRequest request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.Question)) return BadRequest("Question must not be empty.");
         var chat = await db.ChatSessions.Include(x => x.Workspace).SingleOrDefaultAsync(x => x.Id == id && x.Workspace!.UserId == CurrentUserId, cancellationToken);
         if (chat is null) return NotFound("Chat not found.");
 

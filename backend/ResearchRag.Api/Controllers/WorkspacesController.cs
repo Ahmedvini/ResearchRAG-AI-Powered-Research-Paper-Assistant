@@ -24,10 +24,17 @@ public sealed class WorkspacesController(AppDbContext db, IVectorStore vectorSto
     [HttpPost]
     public async Task<ActionResult<WorkspaceDto>> Create(UpsertWorkspaceRequest request, CancellationToken cancellationToken)
     {
+        var name = request.Name.Trim();
+        if (name.Length == 0) return BadRequest("Workspace name is required.");
+        if (await db.Workspaces.AnyAsync(x => x.UserId == CurrentUserId && x.Name == name, cancellationToken))
+        {
+            return Conflict("A workspace with this name already exists.");
+        }
+
         var workspace = new Workspace
         {
             UserId = CurrentUserId,
-            Name = request.Name.Trim(),
+            Name = name,
             Description = request.Description.Trim()
         };
         db.Workspaces.Add(workspace);
@@ -50,7 +57,15 @@ public sealed class WorkspacesController(AppDbContext db, IVectorStore vectorSto
     {
         var workspace = await db.Workspaces.SingleOrDefaultAsync(x => x.Id == id && x.UserId == CurrentUserId, cancellationToken);
         if (workspace is null) return NotFound();
-        workspace.Name = request.Name.Trim();
+
+        var name = request.Name.Trim();
+        if (name.Length == 0) return BadRequest("Workspace name is required.");
+        if (await db.Workspaces.AnyAsync(x => x.UserId == CurrentUserId && x.Name == name && x.Id != id, cancellationToken))
+        {
+            return Conflict("A workspace with this name already exists.");
+        }
+
+        workspace.Name = name;
         workspace.Description = request.Description.Trim();
         await db.SaveChangesAsync(cancellationToken);
         return NoContent();

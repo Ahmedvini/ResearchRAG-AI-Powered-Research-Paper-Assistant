@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using ResearchRag.Application.Abstractions;
 
@@ -37,6 +38,12 @@ public sealed class CohereRerankerProvider(HttpClient httpClient, IConfiguration
     }
 
     private sealed record CohereRerankResponse(IReadOnlyList<CohereRerankResult> Results);
-    private sealed record CohereRerankResult(int Index, double RelevanceScore);
+
+    // Cohere returns snake_case; the default web JSON options only bridge
+    // camelCase, so "relevance_score" needs an explicit property name or it
+    // silently deserializes to 0 for every result.
+    private sealed record CohereRerankResult(
+        int Index,
+        [property: JsonPropertyName("relevance_score")] double RelevanceScore);
 }
 

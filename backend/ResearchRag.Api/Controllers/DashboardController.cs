@@ -28,6 +28,7 @@ public sealed class DashboardController(AppDbContext db) : ApiControllerBase
 
         var topicCounts = await docs
             .Where(x => x.Keywords != null && x.Keywords != "")
+            .OrderByDescending(x => x.CreatedAt)
             .Take(100)
             .Select(x => x.Keywords!)
             .ToListAsync(cancellationToken);

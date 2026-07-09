@@ -17,3 +17,13 @@ def test_recursive_chunk_overlaps_long_text():
     assert all(chunk.section_name == "Methodology" for chunk in chunks)
     assert all(len(chunk.text) <= 220 for chunk in chunks)
 
+
+def test_recursive_chunk_terminates_with_large_overlap():
+    # Regression: overlap close to chunk_size used to loop forever because the
+    # sentence-boundary split moved "end - overlap" back before "start".
+    text = "aa bb cc dd ee ff gg hh ii jj kk ll mm nn oo pp"
+    chunks = recursive_chunk(text, 1, "X", chunk_size=10, overlap=8)
+
+    assert chunks
+    assert all(chunk.text for chunk in chunks)
+

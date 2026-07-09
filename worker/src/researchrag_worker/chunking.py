@@ -28,6 +28,9 @@ def recursive_chunk(text: str, page_number: int, section_name: str, chunk_size: 
             chunks.append(TextChunk(chunk, page_number, section_name))
         if end >= len(cleaned):
             break
-        start = max(0, end - overlap)
+        # Always advance: with a large overlap relative to chunk_size, the
+        # sentence-boundary split can make "end - overlap" fall at or before
+        # the previous start, which loops forever.
+        start = max(start + 1, end - overlap)
     return chunks
 

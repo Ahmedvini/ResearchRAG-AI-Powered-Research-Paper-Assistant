@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ResearchRag.Application.Abstractions;
 using ResearchRag.Infrastructure.Ai;
 using ResearchRag.Infrastructure.Auth;
+using ResearchRag.Infrastructure.Email;
 using ResearchRag.Infrastructure.Persistence;
 using ResearchRag.Infrastructure.Processing;
 using ResearchRag.Infrastructure.Research;
@@ -31,6 +33,11 @@ public static class DependencyInjection
         });
 
         services.AddHttpClient();
+        services.AddSingleton<IEmailSender>(sp =>
+            string.IsNullOrWhiteSpace(configuration["Smtp:Host"])
+                ? new LoggingEmailSender(sp.GetRequiredService<ILogger<LoggingEmailSender>>())
+                : new SmtpEmailSender(configuration));
+        services.AddHostedService<TokenCleanupService>();
         services.AddScoped<IAuthTokenService, AuthTokenService>();
         services.AddScoped<IDocumentProcessorClient, DatabaseDocumentProcessorClient>();
         services.AddScoped<IEmbeddingProvider>(sp => CreateEmbeddingProvider(sp, configuration));

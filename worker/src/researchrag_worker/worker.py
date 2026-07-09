@@ -1,3 +1,4 @@
+import json
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -9,6 +10,7 @@ from sqlalchemy import create_engine, text
 from researchrag_worker.chunking import TextChunk, recursive_chunk
 from researchrag_worker.config import Settings
 from researchrag_worker.embeddings import EmbeddingProvider, create_embedding_provider
+from researchrag_worker.extraction import extract_paper_fields
 from researchrag_worker.metadata import extract_metadata
 from researchrag_worker.pdf import extract_pages
 from researchrag_worker.sections import split_page_into_sections
@@ -154,6 +156,8 @@ def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, set
                 )
             )
 
+        extraction = extract_paper_fields(full_text)
+
         # Old chunk rows are only replaced once every embedding succeeded, so a
         # failed run cannot leave the document half-indexed.
         with engine.begin() as connection:
@@ -168,6 +172,30 @@ def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, set
                     ),
                     row,
                 )
+
+            connection.execute(text("DELETE FROM PaperExtractions WHERE DocumentId=:id"), {"id": job["document_id"]})
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO PaperExtractions
+                        (Id, CreatedAt, DocumentId, PaperTitle, AuthorsJson, Dataset, Model, MetricsJson, Accuracy, LimitationsJson, FutureWorkJson)
+                    VALUES
+                        (:id, UTC_TIMESTAMP(6), :document_id, :title, :authors, :dataset, :model, :metrics, :accuracy, :limitations, :future_work)
+                    """
+                ),
+                {
+                    "id": str(uuid4()),
+                    "document_id": job["document_id"],
+                    "title": (metadata.title or "")[:500],
+                    "authors": json.dumps([author.strip() for author in (metadata.authors or "").split(";") if author.strip()]),
+                    "dataset": extraction.dataset,
+                    "model": extraction.model,
+                    "metrics": extraction.metrics_json,
+                    "accuracy": extraction.accuracy,
+                    "limitations": extraction.limitations_json,
+                    "future_work": extraction.future_work_json,
+                },
+            )
 
         # Batch the upsert: a large PDF can produce thousands of points, and a
         # single request with all of them can exceed Qdrant's payload limits.

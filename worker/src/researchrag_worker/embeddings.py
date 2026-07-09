@@ -1,3 +1,4 @@
+import hashlib
 import math
 import json
 from abc import ABC, abstractmethod
@@ -12,13 +13,24 @@ class EmbeddingProvider(ABC):
         raise NotImplementedError
 
 
+def hash_bucket(token: str, dimension: int) -> int:
+    """Deterministic token bucket shared with the backend's HashEmbeddingProvider.
+
+    Uses the first 4 bytes of MD5 (big-endian) so that queries embedded by the
+    C# API land in the same vector space as chunks embedded here. Python's
+    builtin hash() is seed-randomized per process and must not be used.
+    """
+    digest = hashlib.md5(token.encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big") % dimension
+
+
 class HashEmbeddingProvider(EmbeddingProvider):
     dimension = 384
 
     def embed(self, text: str) -> list[float]:
         vector = [0.0] * self.dimension
         for token in text.lower().split():
-            vector[hash(token) % self.dimension] += 1.0
+            vector[hash_bucket(token, self.dimension)] += 1.0
         magnitude = math.sqrt(sum(value * value for value in vector))
         if magnitude:
             vector = [value / magnitude for value in vector]

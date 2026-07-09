@@ -29,7 +29,7 @@ public static class DependencyInjection
                 return;
             }
 
-            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+            options.UseMySql(connectionString, ResolveServerVersion(connectionString));
         });
 
         services.AddHttpClient();
@@ -98,5 +98,19 @@ public static class DependencyInjection
         var client = factory.CreateClient();
         client.BaseAddress = new Uri(baseUrl);
         return client;
+    }
+
+    private static ServerVersion ResolveServerVersion(string connectionString)
+    {
+        try
+        {
+            return ServerVersion.AutoDetect(connectionString);
+        }
+        catch
+        {
+            // No reachable server (e.g. design-time "dotnet ef" runs): fall back
+            // to the version pinned in docker-compose.
+            return new MySqlServerVersion(new Version(8, 4, 0));
+        }
     }
 }

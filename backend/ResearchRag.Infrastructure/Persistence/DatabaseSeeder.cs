@@ -9,7 +9,16 @@ public static class DatabaseSeeder
 {
     public static async Task SeedAsync(AppDbContext db, CancellationToken cancellationToken = default)
     {
-        await db.Database.EnsureCreatedAsync(cancellationToken);
+        if (db.Database.IsInMemory())
+        {
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+        }
+        else
+        {
+            // Relational databases use migrations so the schema can evolve
+            // without dropping data.
+            await db.Database.MigrateAsync(cancellationToken);
+        }
 
         if (await db.Users.AnyAsync(cancellationToken))
         {

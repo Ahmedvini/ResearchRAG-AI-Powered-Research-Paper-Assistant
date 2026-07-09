@@ -9,7 +9,12 @@ using ResearchRag.Infrastructure.Persistence;
 
 namespace ResearchRag.Api.Controllers;
 
-public sealed class AuthController(AppDbContext db, IAuthTokenService tokenService) : ApiControllerBase
+public sealed class AuthController(
+    AppDbContext db,
+    IAuthTokenService tokenService,
+    IEmailSender emailSender,
+    IConfiguration configuration,
+    ILogger<AuthController> logger) : ApiControllerBase
 {
     private readonly PasswordHasher<User> _hasher = new();
 
@@ -48,6 +53,11 @@ public sealed class AuthController(AppDbContext db, IAuthTokenService tokenServi
 
         var refresh = await AddRefreshTokenAsync(user, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await SendTokenEmailAsync(
+            user.Email,
+            "Verify your ResearchRAG email",
+            $"Welcome to ResearchRAG. Verify your email by opening: {FrontendLink("/verify-email", emailToken)}",
+            cancellationToken);
         return tokenService.CreateAuthResponse(user, refresh);
     }
 
@@ -121,6 +131,11 @@ public sealed class AuthController(AppDbContext db, IAuthTokenService tokenServi
                 ExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
             });
             await db.SaveChangesAsync(cancellationToken);
+            await SendTokenEmailAsync(
+                user.Email,
+                "Reset your ResearchRAG password",
+                $"Reset your password by opening: {FrontendLink("/reset-password", resetToken)}\nThis link expires in one hour.",
+                cancellationToken);
         }
         return Accepted();
     }
@@ -171,6 +186,25 @@ public sealed class AuthController(AppDbContext db, IAuthTokenService tokenServi
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(14)
         });
         return Task.FromResult(refresh);
+    }
+
+    private string FrontendLink(string path, string token)
+    {
+        var baseUrl = (configuration["Email:FrontendBaseUrl"] ?? "http://localhost:5173").TrimEnd('/');
+        return $"{baseUrl}{path}?token={Uri.EscapeDataString(token)}";
+    }
+
+    private async Task SendTokenEmailAsync(string to, string subject, string body, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await emailSender.SendAsync(to, subject, body, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Email delivery must not fail the auth operation itself.
+            logger.LogWarning(ex, "Failed to send '{Subject}' email to {To}.", subject, to);
+        }
     }
 }
 

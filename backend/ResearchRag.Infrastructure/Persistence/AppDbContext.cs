@@ -26,9 +26,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<User>().Property(x => x.PasswordHash).HasMaxLength(512);
         modelBuilder.Entity<User>().Property(x => x.Role).HasConversion<string>().HasMaxLength(32);
 
+        // Indexed string columns need bounded lengths: without HasMaxLength they
+        // map to longtext, which MySQL cannot index (error 1170).
+        modelBuilder.Entity<RefreshToken>().Property(x => x.TokenHash).HasMaxLength(128);
+        modelBuilder.Entity<RefreshToken>().Property(x => x.ReplacedByTokenHash).HasMaxLength(128);
         modelBuilder.Entity<RefreshToken>().HasIndex(x => x.TokenHash).IsUnique();
+        modelBuilder.Entity<OneTimeToken>().Property(x => x.TokenHash).HasMaxLength(128);
+        modelBuilder.Entity<OneTimeToken>().Property(x => x.Purpose).HasMaxLength(64);
         modelBuilder.Entity<OneTimeToken>().HasIndex(x => new { x.TokenHash, x.Purpose }).IsUnique();
 
+        modelBuilder.Entity<Workspace>().Property(x => x.Name).HasMaxLength(200);
         modelBuilder.Entity<Workspace>().HasIndex(x => new { x.UserId, x.Name }).IsUnique();
         modelBuilder.Entity<Document>().Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
         modelBuilder.Entity<Document>().HasIndex(x => new { x.WorkspaceId, x.Status });

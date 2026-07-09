@@ -19,7 +19,7 @@ public sealed class AuthController(AppDbContext db, IAuthTokenService tokenServi
     {
         var email = request.Email.Trim().ToLowerInvariant();
         var displayName = request.DisplayName.Trim();
-        if (email.Length < 5 || !email.Contains('@')) return BadRequest("A valid email address is required.");
+        if (email.Length is < 5 or > 320 || !email.Contains('@')) return BadRequest("A valid email address is required.");
         if (string.IsNullOrWhiteSpace(displayName)) return BadRequest("Display name is required.");
         if (request.Password.Length < 8) return BadRequest("Password must be at least 8 characters.");
 

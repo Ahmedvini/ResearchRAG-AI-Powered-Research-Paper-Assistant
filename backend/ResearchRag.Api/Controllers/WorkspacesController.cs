@@ -25,7 +25,7 @@ public sealed class WorkspacesController(AppDbContext db, IVectorStore vectorSto
     public async Task<ActionResult<WorkspaceDto>> Create(UpsertWorkspaceRequest request, CancellationToken cancellationToken)
     {
         var name = request.Name.Trim();
-        if (name.Length == 0) return BadRequest("Workspace name is required.");
+        if (name.Length is 0 or > 200) return BadRequest("Workspace name must be 1-200 characters.");
         if (await db.Workspaces.AnyAsync(x => x.UserId == CurrentUserId && x.Name == name, cancellationToken))
         {
             return Conflict("A workspace with this name already exists.");
@@ -59,7 +59,7 @@ public sealed class WorkspacesController(AppDbContext db, IVectorStore vectorSto
         if (workspace is null) return NotFound();
 
         var name = request.Name.Trim();
-        if (name.Length == 0) return BadRequest("Workspace name is required.");
+        if (name.Length is 0 or > 200) return BadRequest("Workspace name must be 1-200 characters.");
         if (await db.Workspaces.AnyAsync(x => x.UserId == CurrentUserId && x.Name == name && x.Id != id, cancellationToken))
         {
             return Conflict("A workspace with this name already exists.");

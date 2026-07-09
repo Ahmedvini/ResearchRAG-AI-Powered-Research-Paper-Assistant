@@ -32,13 +32,15 @@ public sealed class RetrievalService(
             .Take(MaxKeywordTerms)
             .ToArray();
 
-        var keywordRows = terms.Length == 0
-            ? []
-            : await baseQuery
+        List<DocumentChunk> keywordRows = [];
+        if (terms.Length > 0)
+        {
+            keywordRows = await baseQuery
                 .Where(ContainsAnyTerm(terms))
                 .OrderBy(x => x.Id)
                 .Take(topK * 3)
                 .ToListAsync(cancellationToken);
+        }
 
         var keywordHits = keywordRows
             .Select(chunk =>

@@ -8,6 +8,7 @@ import { ChatPage } from './pages/ChatPage';
 import { SearchPage } from './pages/SearchPage';
 import { AdminPage } from './pages/AdminPage';
 import { WorkspacesPage } from './pages/WorkspacesPage';
+import { ResearchToolsPage } from './pages/ResearchToolsPage';
 
 function Protected() {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="documents" element={<DocumentsPage />} />
         <Route path="chat" element={<ChatPage />} />
+        <Route path="research" element={<ResearchToolsPage />} />
         <Route path="search" element={<SearchPage />} />
         {user?.role === 'Admin' && <Route path="admin" element={<AdminPage />} />}
       </Route>
@@ -32,4 +34,3 @@ export default function App() {
     </Routes>
   );
 }
-

@@ -37,6 +37,16 @@ services:
       Storage__UploadRoot: ${UPLOAD_ROOT:-/app/uploads}
       Qdrant__Url: ${QDRANT_URL:-http://qdrant:6333}
       Ai__ChatProvider: ${CHAT_PROVIDER:-echo}
+      Ai__EmbeddingProvider: ${EMBEDDING_PROVIDER:-hash}
+      Ai__RerankerProvider: ${RERANKER_PROVIDER:-passthrough}
+      OpenAI__ApiKey: ${OPENAI_API_KEY:-}
+      OpenAI__ChatModel: ${OPENAI_CHAT_MODEL:-gpt-4.1-mini}
+      OpenAI__EmbeddingModel: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      Ollama__BaseUrl: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      Ollama__ChatModel: ${OLLAMA_CHAT_MODEL:-llama3.1}
+      Ollama__EmbeddingModel: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      Cohere__ApiKey: ${COHERE_API_KEY:-}
+      Cohere__RerankModel: ${COHERE_RERANK_MODEL:-rerank-v3.5}
     depends_on:
       mysql:
         condition: service_healthy
@@ -55,7 +65,11 @@ services:
       DATABASE_URL: mysql+pymysql://${MYSQL_USER:-researchrag}:${MYSQL_PASSWORD:-researchrag}@mysql:3306/${MYSQL_DATABASE:-researchrag}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       UPLOAD_ROOT: ${UPLOAD_ROOT:-/app/uploads}
-      EMBEDDING_MODEL: BAAI/bge-large-en-v1.5
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hash}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     depends_on:
       mysql:
         condition: service_healthy
@@ -79,4 +93,3 @@ volumes:
   mysql-data:
   qdrant-data:
   uploads:
-

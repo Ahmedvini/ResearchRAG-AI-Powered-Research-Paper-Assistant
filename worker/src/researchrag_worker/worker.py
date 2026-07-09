@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 
 from researchrag_worker.chunking import TextChunk, recursive_chunk
 from researchrag_worker.config import Settings
-from researchrag_worker.embeddings import HashEmbeddingProvider
+from researchrag_worker.embeddings import EmbeddingProvider, create_embedding_provider
 from researchrag_worker.metadata import extract_metadata
 from researchrag_worker.pdf import extract_pages
 from researchrag_worker.sections import split_page_into_sections
@@ -18,7 +18,13 @@ def main() -> None:
     settings = Settings()
     engine = create_engine(settings.database_url, pool_pre_ping=True)
     qdrant = QdrantClient(url=settings.qdrant_url)
-    embeddings = HashEmbeddingProvider()
+    embeddings = create_embedding_provider(
+        settings.embedding_provider,
+        settings.embedding_model,
+        settings.openai_api_key,
+        settings.openai_base_url,
+        settings.ollama_base_url,
+    )
     ensure_collection(qdrant, settings.qdrant_collection, embeddings.dimension)
 
     while True:
@@ -53,7 +59,7 @@ def claim_next_job(engine):
         return dict(row)
 
 
-def process_job(engine, qdrant: QdrantClient, embeddings: HashEmbeddingProvider, settings: Settings, job: dict) -> None:
+def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, settings: Settings, job: dict) -> None:
     try:
         path = Path(job["storage_path"])
         pages = extract_pages(path)
@@ -140,4 +146,3 @@ def ensure_collection(qdrant: QdrantClient, collection: str, dimension: int) -> 
     existing = {item.name for item in qdrant.get_collections().collections}
     if collection not in existing:
         qdrant.create_collection(collection, vectors_config=VectorParams(size=dimension, distance=Distance.COSINE))
-

@@ -77,3 +77,45 @@ export type SearchResult = {
   score: number;
 };
 
+export type LiteratureReview = {
+  background: string;
+  existingMethods: string;
+  trends: string;
+  researchGaps: string;
+  futureWork: string;
+  markdown: string;
+};
+
+export type PaperComparisonRow = {
+  documentId: string;
+  paper: string;
+  dataset: string;
+  model: string;
+  methodology: string;
+  metrics: string;
+  results: string;
+  strengths: string;
+  weaknesses: string;
+};
+
+export type PaperComparison = {
+  rows: PaperComparisonRow[];
+};
+
+export type ResearchGapReport = {
+  commonLimitations: string[];
+  underexploredAreas: string[];
+  missingDatasets: string[];
+  missingEvaluations: string[];
+  markdown: string;
+};
+
+export type KnowledgeGraph = {
+  nodes: Array<{ id: string; label: string; type: string }>;
+  edges: Array<{ source: string; target: string; relation: string }>;
+};
+
+export type StudyTools = {
+  flashcards: Array<{ front: string; back: string }>;
+  quiz: Array<{ type: string; question: string; options: string[]; answer: string }>;
+};

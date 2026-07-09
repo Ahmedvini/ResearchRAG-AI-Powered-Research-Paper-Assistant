@@ -1,4 +1,17 @@
-import type { AuthResponse, Chat, ChatMessage, Dashboard, ResearchDocument, SearchResult, Workspace } from './types';
+import type {
+  AuthResponse,
+  Chat,
+  ChatMessage,
+  Dashboard,
+  KnowledgeGraph,
+  LiteratureReview,
+  PaperComparison,
+  ResearchDocument,
+  ResearchGapReport,
+  SearchResult,
+  StudyTools,
+  Workspace
+} from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080`;
 
@@ -63,6 +76,26 @@ export const api = {
     body: JSON.stringify({ question, documentIds })
   }),
   search: (query: string) => request<SearchResult[]>(`/api/Search?q=${encodeURIComponent(query)}`),
+  literatureReview: (workspaceId: string, documentIds: string[]) => request<LiteratureReview>('/api/Research/literature-review', {
+    method: 'POST',
+    body: JSON.stringify({ workspaceId, documentIds })
+  }),
+  paperComparison: (workspaceId: string, documentIds: string[]) => request<PaperComparison>('/api/Research/paper-comparison', {
+    method: 'POST',
+    body: JSON.stringify({ workspaceId, documentIds })
+  }),
+  researchGaps: (workspaceId: string) => request<ResearchGapReport>('/api/Research/research-gaps', {
+    method: 'POST',
+    body: JSON.stringify({ workspaceId })
+  }),
+  knowledgeGraph: (workspaceId: string) => request<KnowledgeGraph>('/api/Research/knowledge-graph', {
+    method: 'POST',
+    body: JSON.stringify({ workspaceId })
+  }),
+  studyTools: (workspaceId: string, documentId: string | null, count: number) => request<StudyTools>('/api/Research/study-tools', {
+    method: 'POST',
+    body: JSON.stringify({ workspaceId, documentId, count })
+  }),
   adminStats: () => request<Record<string, number>>('/api/Admin/stats'),
   processingJobs: () => request<Array<Record<string, unknown>>>('/api/Admin/processing-jobs')
 };

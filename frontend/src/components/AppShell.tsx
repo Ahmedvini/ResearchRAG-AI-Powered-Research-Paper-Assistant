@@ -1,4 +1,4 @@
-import { BarChart3, FileText, LogOut, MessageSquareText, Search, Shield, SquareLibrary } from 'lucide-react';
+import { BarChart3, FileText, FlaskConical, LogOut, MessageSquareText, Search, Shield, SquareLibrary } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearAuth, currentUser } from '../api';
 
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/chat', label: 'Chat', icon: MessageSquareText },
+  { to: '/research', label: 'Research Tools', icon: FlaskConical },
   { to: '/search', label: 'Search', icon: Search }
 ];
 
@@ -63,4 +64,3 @@ export function AppShell() {
     </div>
   );
 }
-

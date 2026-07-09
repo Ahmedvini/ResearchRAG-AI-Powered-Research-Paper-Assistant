@@ -63,3 +63,13 @@ Change seeded credentials before production use.
 ## MVP Boundaries
 
 The MVP implements the core RAG loop and keeps advanced features behind explicit interfaces. Literature reviews, paper comparison, research gap analysis, quizzes, flashcards, and knowledge graphs can be added without changing the workspace, document, retrieval, and chat foundations.
+
+## AI Providers
+
+The app runs locally without external credentials using `echo`, `hash`, and `passthrough` providers. For real model-backed behavior, configure:
+
+- `CHAT_PROVIDER=openai` with `OPENAI_API_KEY`, or `CHAT_PROVIDER=ollama` with a local Ollama server.
+- `EMBEDDING_PROVIDER=openai` or `EMBEDDING_PROVIDER=ollama`.
+- `RERANKER_PROVIDER=cohere` with `COHERE_API_KEY`.
+
+Advanced research tools are available in the app under Research Tools and expose literature review, paper comparison, research gap analysis, knowledge graph, flashcard, and quiz generation endpoints.

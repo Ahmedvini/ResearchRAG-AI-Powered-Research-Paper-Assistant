@@ -72,4 +72,8 @@ The app runs locally without external credentials using `echo`, `hash`, and `pas
 - `EMBEDDING_PROVIDER=openai` or `EMBEDDING_PROVIDER=ollama`.
 - `RERANKER_PROVIDER=cohere` with `COHERE_API_KEY`.
 
+The backend (query embedding) and worker (document embedding) must use the same embedding provider and model, or vectors will not match. Both follow `EMBEDDING_PROVIDER`; the model comes from `OPENAI_EMBEDDING_MODEL` or `OLLAMA_EMBEDDING_MODEL` unless `EMBEDDING_MODEL` is set as an explicit override for the worker. Changing the provider or model requires re-uploading documents (the Qdrant collection dimension is fixed at creation).
+
+When running via Docker, `OLLAMA_BASE_URL` should point at `http://host.docker.internal:11434` (mapped to the host via `extra_hosts`); use `http://localhost:11434` only for processes running directly on the host.
+
 Advanced research tools are available in the app under Research Tools and expose literature review, paper comparison, research gap analysis, knowledge graph, flashcard, and quiz generation endpoints.

@@ -20,7 +20,8 @@ public sealed class HashEmbeddingProviderTests
             .OrderBy(x => x)
             .ToArray();
 
-        Assert.Equal([12, 266, 347], nonzero);
+        int[] expected = [12, 266, 347];
+        Assert.Equal(expected, nonzero);
     }
 
     [Fact]

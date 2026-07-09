@@ -60,6 +60,18 @@ The API seeds:
 
 Change seeded credentials before production use.
 
+## Database Schema
+
+The backend applies EF Core migrations on startup (`Persistence/Migrations`). Databases created by older builds via `EnsureCreated` are not migration-compatible; drop the `mysql-data` volume once when upgrading. After changing entities, add a migration from `backend/`:
+
+```bash
+dotnet ef migrations add <Name> --project ResearchRag.Infrastructure --startup-project ResearchRag.Api --output-dir Persistence/Migrations
+```
+
+## Email
+
+Verification and password-reset emails are sent through SMTP when `SMTP_HOST` is configured. Without it, the backend logs the full email (including the link) instead — check the backend log during development. Links point at `Email:FrontendBaseUrl` (`FRONTEND_ORIGIN` in compose), which serves the `/verify-email` and `/reset-password` pages.
+
 ## MVP Boundaries
 
 The MVP implements the core RAG loop and keeps advanced features behind explicit interfaces. Literature reviews, paper comparison, research gap analysis, quizzes, flashcards, and knowledge graphs can be added without changing the workspace, document, retrieval, and chat foundations.

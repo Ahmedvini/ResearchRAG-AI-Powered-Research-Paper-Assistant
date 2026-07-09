@@ -17,14 +17,15 @@ public sealed class AuthController(AppDbContext db, IAuthTokenService tokenServi
     [AllowAnonymous]
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
-        if (await db.Users.AnyAsync(x => x.Email == request.Email, cancellationToken))
+        var email = request.Email.Trim().ToLowerInvariant();
+        if (await db.Users.AnyAsync(x => x.Email == email, cancellationToken))
         {
             return Conflict("Email is already registered.");
         }
 
         var user = new User
         {
-            Email = request.Email.Trim().ToLowerInvariant(),
+            Email = email,
             DisplayName = request.DisplayName.Trim(),
             PasswordHash = ""
         };

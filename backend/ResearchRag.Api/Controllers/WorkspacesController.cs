@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ResearchRag.Application.Abstractions;
 using ResearchRag.Application.Workspaces;
 using ResearchRag.Domain.Entities;
 using ResearchRag.Infrastructure.Persistence;
@@ -8,7 +9,7 @@ using ResearchRag.Infrastructure.Persistence;
 namespace ResearchRag.Api.Controllers;
 
 [Authorize]
-public sealed class WorkspacesController(AppDbContext db) : ApiControllerBase
+public sealed class WorkspacesController(AppDbContext db, IVectorStore vectorStore) : ApiControllerBase
 {
     [HttpGet]
     public async Task<IReadOnlyList<WorkspaceDto>> List(CancellationToken cancellationToken)
@@ -60,8 +61,21 @@ public sealed class WorkspacesController(AppDbContext db) : ApiControllerBase
     {
         var workspace = await db.Workspaces.SingleOrDefaultAsync(x => x.Id == id && x.UserId == CurrentUserId, cancellationToken);
         if (workspace is null) return NotFound();
+
+        var storagePaths = await db.Documents
+            .Where(x => x.WorkspaceId == id)
+            .Select(x => x.StoragePath)
+            .ToListAsync(cancellationToken);
+
         db.Workspaces.Remove(workspace);
         await db.SaveChangesAsync(cancellationToken);
+
+        await vectorStore.DeleteAsync(id, null, cancellationToken);
+        foreach (var path in storagePaths)
+        {
+            DocumentsController.TryDeleteFile(path);
+        }
+
         return NoContent();
     }
 }

@@ -33,7 +33,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<Document>().Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
         modelBuilder.Entity<Document>().HasIndex(x => new { x.WorkspaceId, x.Status });
         modelBuilder.Entity<DocumentChunk>().HasIndex(x => new { x.WorkspaceId, x.DocumentId });
-        modelBuilder.Entity<DocumentChunk>().HasIndex(x => x.Text).HasDatabaseName("IX_DocumentChunks_Text");
+        // No index on DocumentChunk.Text: it maps to longtext, which MySQL cannot
+        // index without a prefix length (error 1170), and a btree index would not
+        // serve the LIKE '%term%' keyword search anyway.
         modelBuilder.Entity<ProcessingJob>().Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
         modelBuilder.Entity<ProcessingJob>().HasIndex(x => x.Status);
         modelBuilder.Entity<PaperExtraction>().HasIndex(x => x.DocumentId).IsUnique();

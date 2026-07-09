@@ -34,7 +34,21 @@ export function ChatPage() {
 
   return (
     <>
-      <PageHeader title="Citation Chat" description="Ask questions over ready papers in a workspace and inspect the source chunks used for each answer." action={<WorkspacePicker value={workspaceId} onChange={setWorkspaceId} />} />
+      <PageHeader
+        title="Citation Chat"
+        description="Ask questions over ready papers in a workspace and inspect the source chunks used for each answer."
+        action={
+          <WorkspacePicker
+            value={workspaceId}
+            onChange={(id) => {
+              // Deselect the previous workspace's chat so messages are not
+              // read from or sent to a chat in another workspace.
+              setWorkspaceId(id);
+              setChatId('');
+            }}
+          />
+        }
+      />
       <div className="grid min-h-[680px] gap-4 lg:grid-cols-[280px_1fr]">
         <aside className="panel p-3">
           <button className="command-button mb-3 w-full justify-center" disabled={!workspaceId || createChat.isPending} onClick={() => createChat.mutate()}>

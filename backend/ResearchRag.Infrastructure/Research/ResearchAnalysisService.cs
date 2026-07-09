@@ -21,17 +21,20 @@ public sealed class ResearchAnalysisService(AppDbContext db, ILLMProvider llmPro
         var gaps = SummarizeThemes(documents, chunks, "limit");
         var future = SummarizeThemes(documents, chunks, "future");
 
+        // When chunks are available, let the LLM write the full review as the
+        // markdown deliverable; the per-section heuristics stay as the structured
+        // fields instead of being overwritten by the whole generated text.
+        string? generated = null;
         if (chunks.Count > 0)
         {
             var retrieved = chunks.Select(ToRetrievedChunk).ToList();
-            var generated = await llmProvider.GenerateAnswerAsync(
+            generated = await llmProvider.GenerateAnswerAsync(
                 "Generate a concise literature review with sections: Research Background, Existing Methods, Current Trends, Research Gaps, Future Work.",
                 retrieved,
                 cancellationToken);
-            background = generated;
         }
 
-        var markdown = new StringBuilder()
+        var markdown = generated ?? new StringBuilder()
             .AppendLine("# Literature Review")
             .AppendLine()
             .AppendLine("## Research Background")
@@ -153,14 +156,15 @@ public sealed class ResearchAnalysisService(AppDbContext db, ILLMProvider llmPro
     public async Task<StudyToolsDto> GenerateStudyToolsAsync(Guid userId, StudyToolsRequest request, CancellationToken cancellationToken)
     {
         var documentIds = request.DocumentId is null ? null : new[] { request.DocumentId.Value };
-        var chunks = await LoadRepresentativeChunksAsync(userId, request.WorkspaceId, documentIds, Math.Clamp(request.Count, 3, 20), cancellationToken);
+        var count = Math.Clamp(request.Count, 3, 20);
+        var chunks = await LoadRepresentativeChunksAsync(userId, request.WorkspaceId, documentIds, count, cancellationToken);
 
-        var flashcards = chunks.Take(request.Count).Select(chunk =>
+        var flashcards = chunks.Take(count).Select(chunk =>
             new FlashcardDto(
                 $"What is a key point from {chunk.Document?.Title ?? chunk.Document?.OriginalFileName ?? "this paper"}?",
                 Trim(chunk.Text, 360))).ToList();
 
-        var quiz = chunks.Take(request.Count).Select(chunk =>
+        var quiz = chunks.Take(count).Select(chunk =>
             new QuizQuestionDto(
                 "OpenEnded",
                 $"Explain the idea discussed in {chunk.SectionName} on page {chunk.PageNumber}.",

@@ -47,6 +47,8 @@ services:
       Ollama__EmbeddingModel: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
       Cohere__ApiKey: ${COHERE_API_KEY:-}
       Cohere__RerankModel: ${COHERE_RERANK_MODEL:-rerank-v3.5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       mysql:
         condition: service_healthy
@@ -66,10 +68,16 @@ services:
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       UPLOAD_ROOT: ${UPLOAD_ROOT:-/app/uploads}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hash}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      # Optional override; when empty the worker uses the same provider-specific
+      # models as the backend (OPENAI_EMBEDDING_MODEL / OLLAMA_EMBEDDING_MODEL).
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       mysql:
         condition: service_healthy

@@ -19,6 +19,10 @@ export function getToken() {
   return localStorage.getItem('researchrag.accessToken');
 }
 
+function getRefreshToken() {
+  return localStorage.getItem('researchrag.refreshToken');
+}
+
 export function setAuth(auth: AuthResponse) {
   localStorage.setItem('researchrag.accessToken', auth.accessToken);
   localStorage.setItem('researchrag.refreshToken', auth.refreshToken);
@@ -36,18 +40,58 @@ export function currentUser() {
   return raw ? JSON.parse(raw) : null;
 }
 
+// Deduplicates concurrent refresh attempts: many queries can hit 401 at once
+// when the access token expires, but the rotating refresh token is single-use.
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshSession(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  refreshInFlight ??= (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/Auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      });
+      if (!response.ok) return false;
+      setAuth((await response.json()) as AuthResponse);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  const refreshed = await refreshInFlight;
+  refreshInFlight = null;
+  return refreshed;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const headers = new Headers(options.headers);
-  const token = getToken();
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (!(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
+  const send = async () => {
+    const headers = new Headers(options.headers);
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (!(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
+    return fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  };
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    response = await send();
   } catch {
     throw new Error(`Cannot reach the ResearchRAG API at ${API_BASE_URL}. Start the backend and try again.`);
   }
+
+  if (response.status === 401 && !path.startsWith('/api/Auth/')) {
+    if (await tryRefreshSession()) {
+      response = await send();
+    } else {
+      clearAuth();
+      window.location.assign('/login');
+      throw new Error('Your session expired. Sign in again.');
+    }
+  }
+
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || response.statusText);

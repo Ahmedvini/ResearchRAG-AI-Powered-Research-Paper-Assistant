@@ -20,7 +20,7 @@ def main() -> None:
     qdrant = QdrantClient(url=settings.qdrant_url)
     embeddings = create_embedding_provider(
         settings.embedding_provider,
-        settings.embedding_model,
+        settings.resolve_embedding_model(),
         settings.openai_api_key,
         settings.openai_base_url,
         settings.ollama_base_url,
@@ -28,26 +28,59 @@ def main() -> None:
     ensure_collection(qdrant, settings.qdrant_collection, embeddings.dimension)
 
     while True:
-        job = claim_next_job(engine)
+        job = claim_next_job(engine, settings)
         if not job:
             time.sleep(settings.poll_seconds)
             continue
         process_job(engine, qdrant, embeddings, settings, job)
 
 
-def claim_next_job(engine):
+def claim_next_job(engine, settings: Settings):
     with engine.begin() as connection:
+        # Requeue jobs whose worker died mid-run so they are not stuck in
+        # 'Running' forever.
+        connection.execute(
+            text(
+                """
+                UPDATE ProcessingJobs j
+                JOIN Documents d ON d.Id = j.DocumentId
+                SET j.Status='Queued', j.StartedAt=NULL, d.Status='Queued'
+                WHERE j.Status='Running'
+                  AND j.StartedAt < (UTC_TIMESTAMP(6) - INTERVAL :minutes MINUTE)
+                """
+            ),
+            {"minutes": settings.stale_running_minutes},
+        )
+        # Give up on jobs that exhausted their retries.
+        connection.execute(
+            text(
+                """
+                UPDATE ProcessingJobs j
+                JOIN Documents d ON d.Id = j.DocumentId
+                SET j.Status='Failed',
+                    j.LastError=COALESCE(j.LastError, 'Retry limit reached.'),
+                    j.CompletedAt=UTC_TIMESTAMP(6),
+                    d.Status='Failed',
+                    d.FailureReason=COALESCE(d.FailureReason, 'Retry limit reached.')
+                WHERE j.Status='Queued' AND j.Attempts >= :max_attempts
+                """
+            ),
+            {"max_attempts": settings.max_attempts},
+        )
         row = connection.execute(
             text(
                 """
-                SELECT j.Id AS job_id, j.DocumentId AS document_id, d.StoragePath AS storage_path, d.WorkspaceId AS workspace_id
+                SELECT j.Id AS job_id, j.DocumentId AS document_id, j.Attempts AS attempts,
+                       d.StoragePath AS storage_path, d.WorkspaceId AS workspace_id
                 FROM ProcessingJobs j
                 JOIN Documents d ON d.Id = j.DocumentId
-                WHERE j.Status = 'Queued'
+                WHERE j.Status = 'Queued' AND j.Attempts < :max_attempts
                 ORDER BY j.CreatedAt
                 LIMIT 1
+                FOR UPDATE OF j SKIP LOCKED
                 """
-            )
+            ),
+            {"max_attempts": settings.max_attempts},
         ).mappings().first()
         if not row:
             return None
@@ -56,7 +89,9 @@ def claim_next_job(engine):
             {"id": row["job_id"]},
         )
         connection.execute(text("UPDATE Documents SET Status='Extracting' WHERE Id=:id"), {"id": row["document_id"]})
-        return dict(row)
+        job = dict(row)
+        job["attempts"] = row["attempts"] + 1  # value after the claim above
+        return job
 
 
 def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, settings: Settings, job: dict) -> None:
@@ -131,15 +166,28 @@ def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, set
                 {"id": job["job_id"]},
             )
     except Exception as exc:
+        error = str(exc)[:1000]
+        exhausted = job.get("attempts", settings.max_attempts) >= settings.max_attempts
         with engine.begin() as connection:
-            connection.execute(
-                text("UPDATE Documents SET Status='Failed', FailureReason=:error WHERE Id=:id"),
-                {"id": job["document_id"], "error": str(exc)[:1000]},
-            )
-            connection.execute(
-                text("UPDATE ProcessingJobs SET Status='Failed', LastError=:error, CompletedAt=UTC_TIMESTAMP(6) WHERE Id=:id"),
-                {"id": job["job_id"], "error": str(exc)[:1000]},
-            )
+            if exhausted:
+                connection.execute(
+                    text("UPDATE Documents SET Status='Failed', FailureReason=:error WHERE Id=:id"),
+                    {"id": job["document_id"], "error": error},
+                )
+                connection.execute(
+                    text("UPDATE ProcessingJobs SET Status='Failed', LastError=:error, CompletedAt=UTC_TIMESTAMP(6) WHERE Id=:id"),
+                    {"id": job["job_id"], "error": error},
+                )
+            else:
+                # Attempts remain: put the job back in the queue for a retry.
+                connection.execute(
+                    text("UPDATE Documents SET Status='Queued', FailureReason=:error WHERE Id=:id"),
+                    {"id": job["document_id"], "error": error},
+                )
+                connection.execute(
+                    text("UPDATE ProcessingJobs SET Status='Queued', LastError=:error, StartedAt=NULL WHERE Id=:id"),
+                    {"id": job["job_id"], "error": error},
+                )
 
 
 def ensure_collection(qdrant: QdrantClient, collection: str, dimension: int) -> None:

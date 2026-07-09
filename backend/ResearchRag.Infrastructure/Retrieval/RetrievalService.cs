@@ -1,6 +1,8 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using ResearchRag.Application.Abstractions;
 using ResearchRag.Application.Services;
+using ResearchRag.Domain.Entities;
 using ResearchRag.Infrastructure.Persistence;
 
 namespace ResearchRag.Infrastructure.Retrieval;
@@ -11,6 +13,8 @@ public sealed class RetrievalService(
     IVectorStore vectorStore,
     IRerankerProvider rerankerProvider) : IRetrievalService
 {
+    private const int MaxKeywordTerms = 16;
+
     public async Task<IReadOnlyList<RetrievedChunk>> RetrieveAsync(Guid workspaceId, IReadOnlyList<Guid>? documentIds, string query, int topK, CancellationToken cancellationToken)
     {
         var baseQuery = db.DocumentChunks
@@ -22,11 +26,19 @@ public sealed class RetrievalService(
             baseQuery = baseQuery.Where(x => documentIds.Contains(x.DocumentId));
         }
 
-        var terms = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var keywordRows = await baseQuery
-            .Where(x => terms.Any(term => x.Text.Contains(term)))
-            .Take(topK * 3)
-            .ToListAsync(cancellationToken);
+        var terms = query
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(MaxKeywordTerms)
+            .ToArray();
+
+        var keywordRows = terms.Length == 0
+            ? []
+            : await baseQuery
+                .Where(ContainsAnyTerm(terms))
+                .OrderBy(x => x.Id)
+                .Take(topK * 3)
+                .ToListAsync(cancellationToken);
 
         var keywordHits = keywordRows
             .Select(chunk =>
@@ -47,7 +59,27 @@ public sealed class RetrievalService(
         return await rerankerProvider.RerankAsync(query, merged, topK, cancellationToken);
     }
 
-    private static RetrievedChunk ToRetrievedChunk(Domain.Entities.DocumentChunk chunk, double semanticScore, double keywordScore, double combinedScore)
+    // Builds "chunk.Text.Contains(t1) || chunk.Text.Contains(t2) || ..." as an
+    // expression tree. The previous "terms.Any(term => x.Text.Contains(term))"
+    // form needs EF's parameterized-collection translation, which the MySQL
+    // provider does not support; this form translates to plain LIKE clauses.
+    private static Expression<Func<DocumentChunk, bool>> ContainsAnyTerm(IReadOnlyList<string> terms)
+    {
+        var parameter = Expression.Parameter(typeof(DocumentChunk), "chunk");
+        var textProperty = Expression.Property(parameter, nameof(DocumentChunk.Text));
+        var containsMethod = typeof(string).GetMethod(nameof(string.Contains), [typeof(string)])!;
+
+        Expression? body = null;
+        foreach (var term in terms)
+        {
+            var call = Expression.Call(textProperty, containsMethod, Expression.Constant(term));
+            body = body is null ? call : Expression.OrElse(body, call);
+        }
+
+        return Expression.Lambda<Func<DocumentChunk, bool>>(body ?? Expression.Constant(false), parameter);
+    }
+
+    private static RetrievedChunk ToRetrievedChunk(DocumentChunk chunk, double semanticScore, double keywordScore, double combinedScore)
     {
         return new RetrievedChunk(
             chunk.Id,
@@ -61,4 +93,3 @@ public sealed class RetrievalService(
             combinedScore);
     }
 }
-

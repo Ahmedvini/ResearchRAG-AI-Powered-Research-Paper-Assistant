@@ -5,7 +5,7 @@ ResearchRAG is a production-oriented MVP for an academic research assistant. It 
 ## Stack
 
 - Frontend: React, TypeScript, Tailwind CSS, React Query, React Router, Recharts
-- Backend: ASP.NET Core 9, Clean Architecture, CQRS-style application services, MediatR, EF Core, JWT
+- Backend: ASP.NET Core 9, layered application services, EF Core, JWT
 - Worker: Python, PyMuPDF, SQLAlchemy, Qdrant client
 - Data: MySQL and Qdrant
 

@@ -36,6 +36,33 @@ public sealed class QdrantVectorStore(HttpClient httpClient, IConfiguration conf
             .ToList() ?? [];
     }
 
+    public async Task DeleteAsync(Guid workspaceId, Guid? documentId, CancellationToken cancellationToken)
+    {
+        var collection = configuration["Qdrant:Collection"] ?? "researchrag_chunks";
+        var must = new List<object>
+        {
+            new { key = "workspace_id", match = new { value = workspaceId.ToString() } }
+        };
+
+        if (documentId is not null)
+        {
+            must.Add(new { key = "document_id", match = new { value = documentId.Value.ToString() } });
+        }
+
+        try
+        {
+            await httpClient.PostAsJsonAsync(
+                $"/collections/{collection}/points/delete?wait=true",
+                new { filter = new { must } },
+                cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            // Best-effort cleanup: an unreachable vector store must not block
+            // deleting the document or workspace itself.
+        }
+    }
+
     private sealed record QdrantSearchResponse(List<QdrantHit>? Result);
     private sealed record QdrantHit(double Score, Dictionary<string, object>? Payload);
 }

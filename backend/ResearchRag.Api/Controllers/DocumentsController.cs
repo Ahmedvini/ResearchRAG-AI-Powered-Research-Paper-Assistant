@@ -10,7 +10,7 @@ using ResearchRag.Infrastructure.Persistence;
 namespace ResearchRag.Api.Controllers;
 
 [Authorize]
-public sealed class DocumentsController(AppDbContext db, IConfiguration configuration, IDocumentProcessorClient processor) : ApiControllerBase
+public sealed class DocumentsController(AppDbContext db, IConfiguration configuration, IDocumentProcessorClient processor, IVectorStore vectorStore) : ApiControllerBase
 {
     [HttpGet("workspace/{workspaceId:guid}")]
     public async Task<IReadOnlyList<DocumentDto>> List(Guid workspaceId, CancellationToken cancellationToken)
@@ -37,7 +37,9 @@ public sealed class DocumentsController(AppDbContext db, IConfiguration configur
         var root = configuration["Storage:UploadRoot"] ?? "uploads";
         Directory.CreateDirectory(root);
         var stored = $"{Guid.NewGuid():N}.pdf";
-        var path = Path.Combine(root, stored);
+        // Store an absolute path: the worker resolves StoragePath from its own
+        // working directory, so a relative path only works by accident.
+        var path = Path.GetFullPath(Path.Combine(root, stored));
         await using (var stream = System.IO.File.Create(path))
         {
             await file.CopyToAsync(stream, cancellationToken);
@@ -84,7 +86,27 @@ public sealed class DocumentsController(AppDbContext db, IConfiguration configur
         if (document is null) return NotFound();
         db.Documents.Remove(document);
         await db.SaveChangesAsync(cancellationToken);
+        await vectorStore.DeleteAsync(document.WorkspaceId, document.Id, cancellationToken);
+        TryDeleteFile(document.StoragePath);
         return NoContent();
+    }
+
+    internal static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (System.IO.File.Exists(path))
+            {
+                System.IO.File.Delete(path);
+            }
+        }
+        catch (IOException)
+        {
+            // Best-effort: a locked or missing file must not fail the delete request.
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static DocumentDto ToDto(Document x)

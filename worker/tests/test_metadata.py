@@ -21,3 +21,21 @@ def test_extract_metadata_from_common_paper_shape():
     assert "brain computer interfaces" in metadata.abstract
     assert metadata.keywords == "BCI, EEG, classification"
 
+
+def test_publication_year_ignores_cited_references():
+    text = """Deep Learning for EEG Analysis
+Jane Doe; John Smith
+Published 2024
+
+Abstract
+We study EEG classification building on LeCun (1998) and Hinton (2006).
+
+Introduction
+Prior work from 1997 established recurrent architectures.
+"""
+
+    metadata = extract_metadata(text)
+
+    assert metadata.publication_year == 2024
+    assert metadata.authors == "Jane Doe; John Smith"
+

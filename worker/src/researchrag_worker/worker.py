@@ -6,6 +6,7 @@ from uuid import uuid4
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, PointStruct, VectorParams
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from researchrag_worker.chunking import TextChunk, recursive_chunk
 from researchrag_worker.config import Settings
@@ -16,6 +17,7 @@ from researchrag_worker.pdf import extract_pages
 from researchrag_worker.sections import split_page_into_sections
 
 UPSERT_BATCH_SIZE = 128
+STARTUP_RETRIES = 30
 
 
 def main() -> None:
@@ -29,10 +31,29 @@ def main() -> None:
         settings.openai_base_url,
         settings.ollama_base_url,
     )
-    ensure_collection(qdrant, settings.qdrant_collection, embeddings.dimension)
+
+    for attempt in range(STARTUP_RETRIES):
+        try:
+            ensure_collection(qdrant, settings.qdrant_collection, embeddings.dimension)
+            break
+        except ValueError:
+            raise  # dimension mismatch is a configuration error, not a race
+        except Exception as exc:
+            if attempt == STARTUP_RETRIES - 1:
+                raise
+            print(f"Qdrant not ready ({exc}); retrying in {settings.poll_seconds}s", flush=True)
+            time.sleep(settings.poll_seconds)
 
     while True:
-        job = claim_next_job(engine, settings)
+        try:
+            job = claim_next_job(engine, settings)
+        except (OperationalError, ProgrammingError) as exc:
+            # The database is still starting or the backend has not applied its
+            # migrations yet (e.g. missing tables on first boot). Wait instead
+            # of crash-looping the container.
+            print(f"Database not ready ({exc.orig}); retrying in {settings.poll_seconds}s", flush=True)
+            time.sleep(settings.poll_seconds)
+            continue
         if not job:
             time.sleep(settings.poll_seconds)
             continue

@@ -31,6 +31,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<RefreshToken>().Property(x => x.TokenHash).HasMaxLength(128);
         modelBuilder.Entity<RefreshToken>().Property(x => x.ReplacedByTokenHash).HasMaxLength(128);
         modelBuilder.Entity<RefreshToken>().HasIndex(x => x.TokenHash).IsUnique();
+        modelBuilder.Entity<RefreshToken>().HasIndex(x => x.FamilyId);
         modelBuilder.Entity<OneTimeToken>().Property(x => x.TokenHash).HasMaxLength(128);
         modelBuilder.Entity<OneTimeToken>().Property(x => x.Purpose).HasMaxLength(64);
         modelBuilder.Entity<OneTimeToken>().HasIndex(x => new { x.TokenHash, x.Purpose }).IsUnique();

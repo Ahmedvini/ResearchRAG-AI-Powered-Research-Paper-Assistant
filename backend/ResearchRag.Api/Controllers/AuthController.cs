@@ -85,6 +85,29 @@ public sealed class AuthController(
         var existing = await db.RefreshTokens.Include(x => x.User).SingleOrDefaultAsync(x => x.TokenHash == hash, cancellationToken);
         if (existing?.User is null || !existing.IsActive)
         {
+            // A revoked token that comes back means it was already rotated:
+            // either an attacker replayed a stolen token, or the legitimate
+            // client lost the rotation result. Both parties get logged out by
+            // revoking every active token in the family.
+            if (existing is { RevokedAt: not null })
+            {
+                var now = DateTimeOffset.UtcNow;
+                var familyTokens = await db.RefreshTokens
+                    .Where(x => x.FamilyId == existing.FamilyId && x.RevokedAt == null)
+                    .ToListAsync(cancellationToken);
+                foreach (var token in familyTokens)
+                {
+                    token.RevokedAt = now;
+                }
+
+                if (familyTokens.Count > 0)
+                {
+                    await db.SaveChangesAsync(cancellationToken);
+                    logger.LogWarning("Refresh token reuse detected for user {UserId}; revoked {Count} tokens in family {FamilyId}.",
+                        existing.UserId, familyTokens.Count, existing.FamilyId);
+                }
+            }
+
             return Unauthorized("Refresh token is invalid or expired.");
         }
 
@@ -95,6 +118,7 @@ public sealed class AuthController(
         {
             UserId = existing.UserId,
             TokenHash = tokenService.HashSecret(replacement),
+            FamilyId = existing.FamilyId,
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(14)
         });
         await db.SaveChangesAsync(cancellationToken);
@@ -183,6 +207,7 @@ public sealed class AuthController(
         {
             User = user,
             TokenHash = tokenService.HashSecret(refresh),
+            FamilyId = Guid.NewGuid(),
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(14)
         });
         return Task.FromResult(refresh);

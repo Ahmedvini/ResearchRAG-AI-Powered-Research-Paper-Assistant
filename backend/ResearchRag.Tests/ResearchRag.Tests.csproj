@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="..\ResearchRag.Api\ResearchRag.Api.csproj" />
     <ProjectReference Include="..\ResearchRag.Application\ResearchRag.Application.csproj" />
     <ProjectReference Include="..\ResearchRag.Infrastructure\ResearchRag.Infrastructure.csproj" />
   </ItemGroup>

@@ -30,6 +30,7 @@ source = ["researchrag_worker"]
 omit = [
   "src/researchrag_worker/__main__.py",
   "src/researchrag_worker/config.py",
+  "src/researchrag_worker/llm.py",
   "src/researchrag_worker/pdf.py",
   "src/researchrag_worker/worker.py"
 ]

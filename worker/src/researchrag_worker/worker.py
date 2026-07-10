@@ -11,7 +11,8 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from researchrag_worker.chunking import TextChunk, recursive_chunk
 from researchrag_worker.config import Settings
 from researchrag_worker.embeddings import EmbeddingProvider, create_embedding_provider
-from researchrag_worker.extraction import extract_paper_fields
+from researchrag_worker.extraction import extract_paper_fields, extract_paper_fields_llm
+from researchrag_worker.llm import LlmClient, create_llm_client
 from researchrag_worker.metadata import extract_metadata
 from researchrag_worker.pdf import extract_pages
 from researchrag_worker.sections import split_page_into_sections
@@ -30,6 +31,14 @@ def main() -> None:
         settings.openai_api_key,
         settings.openai_base_url,
         settings.ollama_base_url,
+    )
+    llm = create_llm_client(
+        settings.chat_provider,
+        settings.openai_api_key,
+        settings.openai_base_url,
+        settings.openai_chat_model,
+        settings.ollama_base_url,
+        settings.ollama_chat_model,
     )
 
     for attempt in range(STARTUP_RETRIES):
@@ -57,7 +66,7 @@ def main() -> None:
         if not job:
             time.sleep(settings.poll_seconds)
             continue
-        process_job(engine, qdrant, embeddings, settings, job)
+        process_job(engine, qdrant, embeddings, settings, job, llm)
 
 
 def claim_next_job(engine, settings: Settings):
@@ -119,7 +128,7 @@ def claim_next_job(engine, settings: Settings):
         return job
 
 
-def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, settings: Settings, job: dict) -> None:
+def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, settings: Settings, job: dict, llm: LlmClient | None = None) -> None:
     try:
         path = Path(job["storage_path"])
         pages = extract_pages(path)
@@ -177,7 +186,11 @@ def process_job(engine, qdrant: QdrantClient, embeddings: EmbeddingProvider, set
                 )
             )
 
-        extraction = extract_paper_fields(full_text)
+        # LLM extraction when a chat provider is configured; regex heuristics
+        # otherwise, or whenever the LLM call/parse fails.
+        extraction = extract_paper_fields_llm(llm, full_text) if llm is not None else None
+        if extraction is None:
+            extraction = extract_paper_fields(full_text)
 
         # Old chunk rows are only replaced once every embedding succeeded, so a
         # failed run cannot leave the document half-indexed.

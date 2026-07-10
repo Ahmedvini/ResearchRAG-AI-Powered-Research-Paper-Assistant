@@ -71,6 +71,73 @@ def extract_paper_fields(full_text: str) -> PaperExtractionResult:
     )
 
 
+_EXTRACTION_PROMPT = """You extract structured metadata from research papers.
+Reply with a single JSON object only, no prose, using exactly these keys:
+{"dataset": string, "model": string, "metrics": [string], "accuracy": string, "limitations": [string], "future_work": [string]}
+Use "" or [] when the paper does not state a value.
+
+Paper text:
+"""
+
+
+def extract_paper_fields_llm(client, full_text: str) -> PaperExtractionResult | None:
+    """LLM-backed extraction. Returns None on any failure so callers can fall
+    back to the regex heuristics in extract_paper_fields."""
+    excerpt = full_text[:6000]
+    if len(full_text) > 9000:
+        # Limitations and future work usually live near the end of the paper.
+        excerpt += "\n...\n" + full_text[-3000:]
+    try:
+        response = client.complete(_EXTRACTION_PROMPT + excerpt)
+    except Exception:
+        return None
+    return parse_extraction_response(response)
+
+
+def parse_extraction_response(response: str) -> PaperExtractionResult | None:
+    # Take the outermost JSON object; this also strips markdown fences or any
+    # prose the model wrapped around it.
+    start, end = response.find("{"), response.rfind("}")
+    if start == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(response[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    def text_field(key: str, limit: int) -> str:
+        value = data.get(key)
+        return value.strip()[:limit] if isinstance(value, str) else ""
+
+    def list_field(key: str) -> list[str]:
+        value = data.get(key)
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        return [item.strip()[:300] for item in value if isinstance(item, str) and item.strip()][:6]
+
+    result = PaperExtractionResult(
+        dataset=text_field("dataset", 200),
+        model=text_field("model", 200),
+        metrics_json=json.dumps(list_field("metrics")),
+        accuracy=text_field("accuracy", 50),
+        limitations_json=json.dumps(list_field("limitations")),
+        future_work_json=json.dumps(list_field("future_work")),
+    )
+
+    if (
+        not (result.dataset or result.model or result.accuracy)
+        and result.metrics_json == "[]"
+        and result.limitations_json == "[]"
+        and result.future_work_json == "[]"
+    ):
+        return None  # the model extracted nothing; let the heuristics try
+    return result
+
+
 def _sentences(text: str) -> list[str]:
     normalized = " ".join(text.split())
     return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", normalized) if sentence.strip()]

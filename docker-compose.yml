@@ -79,6 +79,11 @@ services:
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       UPLOAD_ROOT: ${UPLOAD_ROOT:-/app/uploads}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hash}
+      # Chat provider enables LLM-backed paper extraction in the worker; the
+      # default "echo" uses regex heuristics instead.
+      CHAT_PROVIDER: ${CHAT_PROVIDER:-echo}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4.1-mini}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-llama3.1}
       # Optional override; when empty the worker uses the same provider-specific
       # models as the backend (OPENAI_EMBEDDING_MODEL / OLLAMA_EMBEDDING_MODEL).
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}

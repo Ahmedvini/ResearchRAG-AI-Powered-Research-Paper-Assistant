@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     qdrant_collection: str = Field(default="researchrag_chunks", alias="QDRANT_COLLECTION")
     upload_root: str = Field(default="/app/uploads", alias="UPLOAD_ROOT")
     embedding_provider: str = Field(default="hash", alias="EMBEDDING_PROVIDER")
+    # Chat provider powers LLM-backed paper extraction; "echo" (the default)
+    # falls back to regex heuristics.
+    chat_provider: str = Field(default="echo", alias="CHAT_PROVIDER")
+    openai_chat_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_CHAT_MODEL")
+    ollama_chat_model: str = Field(default="llama3.1", alias="OLLAMA_CHAT_MODEL")
     # Explicit override; when empty, the provider-specific model below is used so
     # the worker stays in sync with the backend's OpenAI/Ollama defaults.
     embedding_model: str = Field(default="", alias="EMBEDDING_MODEL")

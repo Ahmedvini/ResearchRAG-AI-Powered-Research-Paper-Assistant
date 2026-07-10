@@ -77,6 +77,61 @@ public sealed class ResearchAnalysisServiceTests
         Assert.Contains(graph.Edges, edge => edge.Relation == "wrote");
     }
 
+    [Fact]
+    public async Task LiteratureReview_uses_llm_output_as_markdown_and_keeps_heuristic_sections()
+    {
+        await using var db = CreateDb();
+        var (user, workspace, document) = SeedDocumentWithChunk(db);
+        await db.SaveChangesAsync();
+
+        var service = new ResearchAnalysisService(db, new EchoLlmProvider());
+        var review = await service.GenerateLiteratureReviewAsync(user.Id, new LiteratureReviewRequest(workspace.Id, [document.Id]), CancellationToken.None);
+
+        // With chunks available the LLM writes the markdown deliverable...
+        Assert.Contains("Based on the retrieved paper excerpts", review.Markdown);
+        // ...while the structured sections keep the heuristic summaries instead
+        // of being overwritten by the full generated review.
+        Assert.DoesNotContain("Based on the retrieved paper excerpts", review.Background);
+    }
+
+    [Fact]
+    public async Task StudyTools_returns_items_even_when_requested_count_is_below_minimum()
+    {
+        await using var db = CreateDb();
+        var (user, workspace, _) = SeedDocumentWithChunk(db);
+        await db.SaveChangesAsync();
+
+        var service = new ResearchAnalysisService(db, new EchoLlmProvider());
+        var tools = await service.GenerateStudyToolsAsync(user.Id, new StudyToolsRequest(workspace.Id, null, 0), CancellationToken.None);
+
+        Assert.NotEmpty(tools.Flashcards);
+        Assert.NotEmpty(tools.Quiz);
+    }
+
+    private static (User User, Workspace Workspace, Document Document) SeedDocumentWithChunk(AppDbContext db)
+    {
+        var user = new User { Email = "researcher@example.com", DisplayName = "Researcher", PasswordHash = "hash" };
+        var workspace = new Workspace { User = user, Name = "BCI", Description = "" };
+        var document = new Document
+        {
+            Workspace = workspace,
+            OriginalFileName = "paper.pdf",
+            StoredFileName = "paper.pdf",
+            StoragePath = "/tmp/paper.pdf",
+            Title = "BCI Classifier"
+        };
+        document.Chunks.Add(new DocumentChunk
+        {
+            Document = document,
+            WorkspaceId = workspace.Id,
+            Text = "The background of this study covers brain computer interfaces.",
+            PageNumber = 1,
+            SectionName = "Introduction"
+        });
+        db.Documents.Add(document);
+        return (user, workspace, document);
+    }
+
     private static AppDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

@@ -20,10 +20,12 @@ public sealed class DashboardController(AppDbContext db) : ApiControllerBase
             .Select(x => new RecentDocumentDto(x.Id, x.OriginalFileName, x.Status.ToString(), x.CreatedAt))
             .ToListAsync(cancellationToken);
 
+        // Order by the group key before projecting: ordering by a DTO
+        // constructor member is not translatable to SQL.
         var papersPerYear = await docs.Where(x => x.PublicationYear != null)
             .GroupBy(x => x.PublicationYear!.Value)
+            .OrderBy(x => x.Key)
             .Select(x => new YearCountDto(x.Key, x.Count()))
-            .OrderBy(x => x.Year)
             .ToListAsync(cancellationToken);
 
         var topicCounts = await docs

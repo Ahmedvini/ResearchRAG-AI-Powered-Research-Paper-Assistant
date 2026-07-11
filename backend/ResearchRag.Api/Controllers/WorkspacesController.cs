@@ -14,10 +14,12 @@ public sealed class WorkspacesController(AppDbContext db, IVectorStore vectorSto
     [HttpGet]
     public async Task<IReadOnlyList<WorkspaceDto>> List(CancellationToken cancellationToken)
     {
+        // Order before projecting: ordering by a DTO constructor member is not
+        // translatable to SQL (it only worked on the in-memory test provider).
         return await db.Workspaces
             .Where(x => x.UserId == CurrentUserId)
-            .Select(x => new WorkspaceDto(x.Id, x.Name, x.Description, x.Documents.Count, x.Chats.Count, x.CreatedAt))
             .OrderBy(x => x.Name)
+            .Select(x => new WorkspaceDto(x.Id, x.Name, x.Description, x.Documents.Count, x.Chats.Count, x.CreatedAt))
             .ToListAsync(cancellationToken);
     }
 

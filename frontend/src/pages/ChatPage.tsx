@@ -21,10 +21,22 @@ export function ChatPage() {
     }
   });
   const send = useMutation({
-    mutationFn: () => api.sendMessage(chatId, question, []),
-    onSuccess: () => {
+    // Asking without a selected chat creates one automatically so the first
+    // question "just works" instead of requiring "New chat" first.
+    mutationFn: async () => {
+      let id = chatId;
+      if (!id) {
+        const chat = await api.createChat(workspaceId, question.slice(0, 60) || 'Research chat');
+        id = chat.id;
+        setChatId(id);
+        queryClient.invalidateQueries({ queryKey: ['chats', workspaceId] });
+      }
+      const answer = await api.sendMessage(id, question, []);
+      return { id, answer };
+    },
+    onSuccess: ({ id }) => {
       setQuestion('');
-      queryClient.invalidateQueries({ queryKey: ['messages', chatId] });
+      queryClient.invalidateQueries({ queryKey: ['messages', id] });
     }
   });
 
@@ -64,6 +76,10 @@ export function ChatPage() {
         </aside>
         <section className="panel flex flex-col overflow-hidden">
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            {!workspaceId && <div className="rounded-md bg-panel p-4 text-sm text-[#60706b]">Select a workspace to start chatting.</div>}
+            {workspaceId && !chatId && messages.length === 0 && (
+              <div className="rounded-md bg-panel p-4 text-sm text-[#60706b]">Type a question below — a chat is created automatically.</div>
+            )}
             {messages.map((message) => (
               <article key={message.id} className={`max-w-4xl rounded-md border p-3 ${message.role === 'user' ? 'ml-auto border-[#d9c99c] bg-[#fffaf0]' : 'border-line bg-white'}`}>
                 <div className="text-xs font-semibold uppercase tracking-normal text-[#60706b]">{message.role}</div>
@@ -79,11 +95,11 @@ export function ChatPage() {
             className="flex gap-2 border-t border-line p-3"
             onSubmit={(event) => {
               event.preventDefault();
-              if (question && chatId) send.mutate();
+              if (question && workspaceId) send.mutate();
             }}
           >
             <input className="field" placeholder="What dataset was used?" value={question} onChange={(event) => setQuestion(event.target.value)} />
-            <button className="command-button" disabled={!question || !chatId || send.isPending}>
+            <button className="command-button" disabled={!question || !workspaceId || send.isPending}>
               <Send className="h-4 w-4" />
               {send.isPending ? 'Asking...' : 'Ask'}
             </button>

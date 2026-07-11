@@ -6,7 +6,7 @@ import { PageHeader } from '../components/PageHeader';
 
 export function WorkspacesPage() {
   const queryClient = useQueryClient();
-  const { data = [], isLoading } = useQuery({ queryKey: ['workspaces'], queryFn: api.workspaces });
+  const { data = [], isLoading, error: listError } = useQuery({ queryKey: ['workspaces'], queryFn: api.workspaces });
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const create = useMutation({
@@ -32,12 +32,18 @@ export function WorkspacesPage() {
           <h2 className="text-base font-bold">New workspace</h2>
           <input className="field" placeholder="BCI Research" value={name} onChange={(event) => setName(event.target.value)} />
           <textarea className="field min-h-24" placeholder="Research focus and collection notes" value={description} onChange={(event) => setDescription(event.target.value)} />
+          {create.error instanceof Error && (
+            <div className="rounded-md border border-[#e4b7a9] bg-[#fff4f0] p-3 text-sm text-[#8a3b25]">{create.error.message}</div>
+          )}
           <button className="command-button" disabled={!name || create.isPending}>
             <Plus className="h-4 w-4" />
-            Create
+            {create.isPending ? 'Creating...' : 'Create'}
           </button>
         </form>
         <div className="grid gap-3 md:grid-cols-2">
+          {listError instanceof Error && (
+            <div className="panel p-4 text-sm text-[#8a3b25]">Could not load workspaces: {listError.message}</div>
+          )}
           {isLoading && <div className="panel p-4 text-sm text-[#60706b]">Loading workspaces...</div>}
           {data.map((workspace) => (
             <article key={workspace.id} className="panel p-4">

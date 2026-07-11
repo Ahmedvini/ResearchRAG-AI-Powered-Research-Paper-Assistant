@@ -1,6 +1,6 @@
-# ResearchRAG
+# PaperMind
 
-ResearchRAG is a production-oriented MVP for an academic research assistant. It supports authenticated workspaces, PDF upload, document processing, hybrid retrieval, citation-aware chat, dashboard metrics, admin operations, Docker deployment, and prepared extension points for advanced research workflows.
+PaperMind is a production-oriented MVP for an academic research assistant. It supports authenticated workspaces, PDF upload, document processing, hybrid retrieval, citation-aware chat, dashboard metrics, admin operations, Docker deployment, and prepared extension points for advanced research workflows.
 
 ## Stack
 

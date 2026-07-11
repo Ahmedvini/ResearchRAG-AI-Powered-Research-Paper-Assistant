@@ -13,7 +13,10 @@ import type {
   Workspace
 } from './types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080`;
+// An explicitly empty VITE_API_BASE_URL means same-origin (production behind a
+// reverse proxy); when the variable is not set at all, fall back to the local
+// backend on port 8080 for development.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? `${window.location.protocol}//${window.location.hostname}:8080`;
 
 export function getToken() {
   return localStorage.getItem('researchrag.accessToken');
@@ -79,7 +82,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     response = await send();
   } catch {
-    throw new Error(`Cannot reach the ResearchRAG API at ${API_BASE_URL}. Start the backend and try again.`);
+    throw new Error(`Cannot reach the ResearchRAG API at ${API_BASE_URL || window.location.origin}. Start the backend and try again.`);
   }
 
   if (response.status === 401 && !path.startsWith('/api/Auth/')) {

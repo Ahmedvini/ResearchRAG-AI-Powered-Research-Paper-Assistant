@@ -1,0 +1,39 @@
+# Production overlay: puts a Caddy reverse proxy (with optional automatic
+# HTTPS) in front of the app and stops publishing the backend/frontend ports
+# directly. Usage:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Set in .env for production:
+#   API_BASE_URL=            (empty -> frontend calls the API same-origin via Caddy)
+#   SITE_ADDRESS=yourdomain  (optional; enables automatic HTTPS)
+#   FRONTEND_ORIGIN=https://yourdomain
+#   JWT_SIGNING_KEY, MYSQL_* (strong values)
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    # Only reachable through Caddy.
+    ports: !reset []
+
+  frontend:
+    # Only reachable through Caddy.
+    ports: !reset []
+
+volumes:
+  caddy-data:
+  caddy-config:
